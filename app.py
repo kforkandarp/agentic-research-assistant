@@ -5,6 +5,9 @@ Streaming: uses app.stream() so each tool step appears as it fires,
 not all at once after the full run completes.
 """
 
+import os
+os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+
 import streamlit as st
 from src.graph import build_graph
 from src.state import AgentState
