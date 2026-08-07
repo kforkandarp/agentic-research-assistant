@@ -1,0 +1,116 @@
+[
+  {
+    "id": "q01",
+    "question": "What method does the paper 'Attention Is All You Need' use to handle word order without recurrence?",
+    "expected_tool": "retrieval",
+    "notes": "Answerable purely from the local ArXiv corpus if that paper is ingested."
+  },
+  {
+    "id": "q02",
+    "question": "What is the BLEU score reported for the base Transformer model on WMT 2014 English-to-German translation?",
+    "expected_tool": "retrieval",
+    "notes": "Specific numeric fact from a paper — tests retrieval precision."
+  },
+  {
+    "id": "q03",
+    "question": "Has there been any notable follow-up work published in 2026 building on the original LoRA paper?",
+    "expected_tool": "web_search",
+    "notes": "Explicitly asks about recent work outside a fixed corpus — should force web_search, not retrieval."
+  },
+  {
+    "id": "q04",
+    "question": "What is the current state-of-the-art model on the GLUE benchmark as of this month?",
+    "expected_tool": "web_search",
+    "notes": "Time-sensitive leaderboard fact — local corpus will be stale."
+  },
+  {
+    "id": "q05",
+    "question": "If a model has 175 billion parameters and each parameter uses 2 bytes in FP16, how much memory is needed just to store the weights, in GB?",
+    "expected_tool": "calculator",
+    "notes": "Pure arithmetic, no retrieval needed even though it's ML-flavored."
+  },
+  {
+    "id": "q06",
+    "question": "What is the definition of overfitting in machine learning?",
+    "expected_tool": "direct_answer",
+    "notes": "General knowledge the LLM already has — no tool needed. Router should NOT call retrieval here."
+  },
+  {
+    "id": "q07",
+    "question": "In plain terms, what's the difference between precision and recall?",
+    "expected_tool": "direct_answer",
+    "notes": "Another general-knowledge check, deliberately similar to q06 to test consistency."
+  },
+  {
+    "id": "q08",
+    "question": "According to the ResNet paper, what is the top-1 error rate improvement of ResNet-152 over VGG-19 on ImageNet? Compute that as a percentage reduction.",
+    "expected_tool": "multi_step",
+    "notes": "Retrieve both numbers from the paper, THEN calculate the percentage — tests tool-chaining."
+  },
+  {
+    "id": "q09",
+    "question": "Find the throughput reported for the base and big Transformer models in the original paper, and tell me how many times faster the big model's training FLOPs are compared to base.",
+    "expected_tool": "multi_step",
+    "notes": "Another retrieve-then-calculate case."
+  },
+  {
+    "id": "q10",
+    "question": "What optimizer and learning rate schedule did the BERT paper use, and has anyone published a more compute-efficient alternative since 2025?",
+    "expected_tool": "multi_step",
+    "notes": "retrieval for the first half, web_search for the second — tests whether the agent can split a compound question."
+  },
+  {
+    "id": "q11",
+    "question": "What is the capital of France?",
+    "expected_tool": "direct_answer",
+    "notes": "Deliberately irrelevant to ML/ArXiv — tests that router doesn't force everything into retrieval just because the corpus exists."
+  },
+  {
+    "id": "q12",
+    "question": "Summarize the main contribution of the paper on Denoising Diffusion Probabilistic Models.",
+    "expected_tool": "retrieval",
+    "notes": "Standard single-document summarization retrieval case."
+  },
+  {
+    "id": "q13",
+    "question": "What's 15% of 2,340?",
+    "expected_tool": "calculator",
+    "notes": "Trivial arithmetic, no ML context at all — sanity check for calculator routing."
+  },
+  {
+    "id": "q14",
+    "question": "Is there a more recent (2026) survey paper that consolidates work on parameter-efficient fine-tuning methods?",
+    "expected_tool": "web_search",
+    "notes": "Explicit recency cue ('2026', 'more recent') should push toward web_search over retrieval."
+  },
+  {
+    "id": "q15",
+    "question": "What does the paper report as GPT-3's parameter count, and how does that compare numerically to GPT-2's parameter count (as a multiple)?",
+    "expected_tool": "multi_step",
+    "notes": "retrieve two facts (possibly from two different papers) → calculate ratio."
+  },
+  {
+    "id": "q16",
+    "question": "What is gradient descent, at a high level?",
+    "expected_tool": "direct_answer",
+    "notes": "Redundant-looking with q06/q07 on purpose — routing consistency across similar 'explain a concept' phrasings."
+  },
+  {
+    "id": "q17",
+    "question": "Retrieve the vocabulary size used in the original Transformer paper's tokenizer, and tell me what fraction that is of GPT-3's vocabulary size.",
+    "expected_tool": "multi_step",
+    "notes": "One number from local corpus, one number likely needing web_search if GPT-3 paper isn't ingested — tests chaining across tool types, not just retrieval+calculator."
+  },
+  {
+    "id": "q18",
+    "question": "This question is intentionally unanswerable from any source: what will next year's ArXiv submission count be?",
+    "expected_tool": "insufficient_information",
+    "notes": "Tests the max-retry guardrail fallback path, not a real tool route."
+  },
+  {
+    "id": "q19",
+    "question": "tell me something about GPT 5.6",
+    "expected_tool": "web_search",
+    "notes": "Information about GPT 5.6 is likely not in the local corpus, so web search is needed."
+  }
+]

@@ -1,0 +1,37 @@
+venv/
+.venv/
+env/
+
+__pycache__/
+*.py[cod]
+*.pyo
+
+.env
+.env.*
+
+data/raw_pdfs/
+data/faiss_index/
+
+# We have kept chunks.json because it's needed at runtime and small enough to commit. 
+#If it grows large later, add it here.
+
+eval/eval_results.json
+eval/eval_results_with_gt.json
+eval/holdout_results.json
+eval/ragas_results.csv
+
+# Keep these — they ARE source files (hand-written, needed for reproducibility):
+# eval/eval_set.json
+# eval/holdout_set.json
+# eval/sync_gt.py
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+*.ipynb
+.ipynb_checkpoints/
+
+*.log
+logs/

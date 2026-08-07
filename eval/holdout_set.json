@@ -1,0 +1,62 @@
+[
+  {
+    "id": "h01",
+    "question": "According to the BERT paper, how many transformer layers does the BERT-Large model have?",
+    "expected_tool": "retrieval",
+    "notes": "Single numeric fact from a corpus paper — clean retrieval test."
+  },
+  {
+    "id": "h02",
+    "question": "What is the difference between bagging and boosting in ensemble learning?",
+    "expected_tool": "direct_answer",
+    "notes": "General ML concept the LLM already knows — router must not over-retrieve."
+  },
+  {
+    "id": "h03",
+    "question": "What is 2 raised to the power of 13, and what is that divided by 1024?",
+    "expected_tool": "calculator",
+    "notes": "Two-part arithmetic, no ML context — pure calculator routing."
+  },
+  {
+    "id": "h04",
+    "question": "Has there been any new large language model released by a major lab in the past month?",
+    "expected_tool": "web_search",
+    "notes": "Explicit recency — corpus is static, must route to web."
+  },
+  {
+    "id": "h05",
+    "question": "According to the GPT-3 paper, how many tokens was the model trained on? If each token is approximately 4 bytes, how many gigabytes of training data is that?",
+    "expected_tool": "multi_step",
+    "notes": "Retrieve token count from paper, then compute GB. Clean retrieve→calculate chain."
+  },
+  {
+    "id": "h06",
+    "question": "What will the most downloaded ArXiv paper of 2028 be?",
+    "expected_tool": "insufficient_information",
+    "notes": "Future prediction — unanswerable from any source, tests honest fallback."
+  },
+  {
+    "id": "h07",
+    "question": "What attention mechanism does the original Transformer use, and according to the paper how many attention heads does the base model have? Multiply those two numbers: heads times the model's d_model dimension.",
+    "expected_tool": "multi_step",
+    "notes": "Retrieve two numbers from the Transformer paper, then calculate their product."
+  },
+  {
+    "id": "h08",
+    "question": "What is the capital of Japan, and what is 500 multiplied by 8?",
+    "expected_tool": "multi_step",
+    "notes": "Deliberately split: direct_answer for geography, calculator for arithmetic. Tests whether evaluate correctly chains both."
+  },
+  {
+    "id": "h09",
+    "question": "According to the DDPM paper, how many diffusion timesteps T does the model use? If you ran 3 separate experiments each requiring T forward passes, how many total forward passes is that?",
+    "expected_tool": "multi_step",
+    "notes": "Retrieve T from DDPM paper, then multiply by 3. Retrieve→calculate."
+  },
+  {
+    "id": "h10",
+    "question": "What loss function does the BERT paper use for the masked language modeling objective, and has there been a more sample-efficient alternative proposed since 2025?",
+    "expected_tool": "multi_step",
+    "notes": "Retrieval for the loss function, web_search for the 2025+ alternative. Retrieve→web_search chain."
+  }
+]
