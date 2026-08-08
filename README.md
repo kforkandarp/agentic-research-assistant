@@ -21,9 +21,8 @@
 | Resource | Link |
 |---|---|
 | 🎯 Interactive Streamlit UI | [agentic-research-assistant-k.streamlit.app](https://agentic-research-assistant-k.streamlit.app/) |
-| 📂 GitHub Repository | [github.com/kforkandarp/agentic-research-assistant](https://github.com/kforkandarp/agentic-research-assistant) |
 
-> App may take 30–60 seconds to wake from sleep on first visit (Streamlit free tier).
+
 
 ---
 
