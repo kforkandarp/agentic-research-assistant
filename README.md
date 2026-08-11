@@ -16,11 +16,12 @@
 
 ---
 
-## 🚀 Live Demo & Deployment
+## 🚀 Live Demo & Key Documentation
 
 | Resource | Link |
 |---|---|
 | 🎯 Interactive Streamlit UI | [agentic-research-assistant-k.streamlit.app](https://agentic-research-assistant-k.streamlit.app/) |
+| 📘 Engineering Decisions & Architecture Trade-offs | [ENGINEERING_DECISIONS.md](ENGINEERING_DECISIONS.md) |
 
 ---
 
