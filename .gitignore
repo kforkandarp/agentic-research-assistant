@@ -1,37 +1,33 @@
-venv/
-.venv/
-env/
-
-__pycache__/
-*.py[cod]
-*.pyo
-
+# Secrets & Environment
 .env
 .env.*
 
+# Python Virtual Environments & Caches
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Raw Downloads, Vector Index & Output Files
 data/raw_pdfs/
 data/faiss_index/
-
-# We have kept chunks.json because it's needed at runtime and small enough to commit. 
-#If it grows large later, add it here.
-
 eval/eval_results.json
-eval/eval_results_with_gt.json
-eval/holdout_results.json
 eval/ragas_results.csv
 
-# Keep these — they ARE source files (hand-written, needed for reproducibility):
-# eval/eval_set.json
-# eval/holdout_set.json
-# eval/sync_gt.py
+# Note: chunks.json is kept committed as runtime corpus payload.
+# Note: eval_set.json, eval_results_with_gt.json, and sync_gt.py are kept committed for reproducibility.
 
+# OS & IDE Files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
+# Jupyter Notebooks & Logs
 *.ipynb
 .ipynb_checkpoints/
-
 *.log
 logs/
