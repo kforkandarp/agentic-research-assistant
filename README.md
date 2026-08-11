@@ -65,7 +65,7 @@ Evaluated using LLaMA 3.3 70B as judge over ground-truth annotated evaluation se
 | **Context Precision** | 11 retrieval queries | **0.9091** | **1.0000** | Cross-Encoder reranking (`ms-marco`) + thresholding ($-2.5$ logit cutoff) ranks top relevant chunks at rank 1. |
 | **Faithfulness** | 30 context queries | **0.7633** | **0.8167** | Grounded system prompt prevents parametric hallucinations during multi-step answer synthesis. |
 | **Answer Relevancy** | 47 answer queries | **0.6824** | **0.8356** | High directness on core queries; mean reflects deliberate refusal paths on temporal 2026 missing-context queries. |
-
+![RAGAS Quality Benchmark Results](assets/ragas_results.png)
 ---
 
 ## 📡 API Reference & Endpoints
