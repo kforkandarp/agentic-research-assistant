@@ -11,18 +11,16 @@
 </p>
 
 <p align="center">
-<b>Self-correcting single-agent LangGraph system</b> that routes queries across hybrid retrieval, web search, calculator, and direct answer — over a corpus of 5 foundational ArXiv ML papers. Features a deterministic evaluate loop, streaming Streamlit UI, production FastAPI wrapper, and a Dockerized deployment.
+<b>Production-grade self-correcting agent system</b> built with LangGraph over an ingested corpus of 45 ArXiv ML papers (~5,500+ chunks). Dynamically routes queries across hybrid vector search, Tavily web search, safe AST arithmetic evaluation, and direct answer synthesis. Features resilient Groq API key-rotation failover, a deterministic evaluator loop, streaming Streamlit UI, FastAPI endpoints, and containerized Docker deployment.
 </p>
 
 ---
 
-## 🚀 Live Demo
+## 🚀 Live Demo & Deployment
 
 | Resource | Link |
 |---|---|
 | 🎯 Interactive Streamlit UI | [agentic-research-assistant-k.streamlit.app](https://agentic-research-assistant-k.streamlit.app/) |
-
-
 
 ---
 
@@ -36,63 +34,50 @@
 
 ![Graph Diagram](graph_diagram.png)
 
-The agent follows a **router → tool → evaluate → (loop or synthesize)** pattern:
+The agent follows a cyclic state machine topology: **`START` → `router` → `tool` → `evaluate` → (loop or `synthesize`) → `END`**:
 
-1. **Router** (LLaMA 3.1 8B) — classifies the query into `retrieval`, `web_search`, `calculator`, or `direct_answer`
-2. **Tool nodes** — execute the selected tool and append results to shared state
-3. **Evaluate node** (LLaMA 3.3 70B) — grades evidence sufficiency; routes back to an untried tool if insufficient, or forward to synthesis if sufficient
-4. **Deterministic guardrails** — regex detects computation signals, prevents tool repetition, enforces `MAX_EVIDENCE_STEPS=4` hard cap
-5. **Synthesize node** — produces a grounded answer; injects a caveat into the system prompt when evidence was judged insufficient to prevent hallucination
+1. **Router Node** (LLaMA 3.1 8B) — classifies queries into `retrieval`, `web_search`, `calculator`, or `direct_answer` using Pydantic structured output.
+2. **Tool Execution Nodes** — execute selected tools and append results to shared state (`Annotated[list, operator.add]`).
+3. **Evaluate Node** (LLaMA 3.3 70B) — checks evidence sufficiency; routes to an untried tool if missing information, or forward to synthesis if sufficient. Capped at `MAX_EVIDENCE_STEPS=4` to prevent infinite execution loops.
+4. **Deterministic Guardrails** — regex pre-checks for computation signals force the calculator when numerical expressions are retrieved, short-circuiting simple queries to prevent LLM over-escalation.
+5. **Synthesize Node** — produces grounded answers; injects warning caveats if evidence was judged insufficient to neutralize hallucination.
 
-**Model tiering:** Router is simple 4-class classification — 8B handles it correctly every time. Evaluator requires multi-step reasoning over accumulated evidence — 8B failed harder cases, so 70B is used there and for synthesis.
+**Key-Rotation Failover Strategy:** Built-in `RunnableWithFallbacks` automatically rotates across multiple Groq tokens (`GROQ_API_KEY1` → `GROQ_API_KEY2`), coupled with `tenacity` exponential backoff retries to eliminate `RateLimitError` quota crashes during high-volume batch evaluations.
 
 ---
 
-## 📊 Evaluation Results
+## 📊 Evaluation & Benchmark Results
 
-### Routing Accuracy
-
-| Set | Correct | Total | Accuracy |
-|---|---|---|---|
-| **Eval set** | 14 | 19 | **73.7%** |
-| **Holdout set** | 7 | 10 | **70.0%** |
+### 1. Routing Accuracy
+* **50-Question Benchmark Suite:** **90.0% Routing Accuracy** (45 / 50 questions routed correctly).
+* Evaluated across 6 target query types: single-hop paper retrieval, multi-step tool chains (`retrieval` + `calculator` / `web_search`), pure arithmetic, direct machine learning definitions, live web search, and unanswerable corpus queries.
 
 ![Eval Set Results](assets/eval_results.png)
 
-![Holdout Set Results](assets/holdout_results.png)
+---
 
-Misses are concentrated in two honest failure patterns — not hallucinations. Corpus gap questions (ResNet/VGG-19 cross-paper comparisons) correctly return `insufficient_information` rather than fabricating. Multi-step chains occasionally hit Groq free-tier rate limits before completing.
+### 2. RAGAS Quality Benchmark
 
-### RAGAS Quality Metrics
+Evaluated using LLaMA 3.3 70B as judge over ground-truth annotated evaluation sets:
 
-| Metric | Score | Eligible Questions |
-|---|---|---|
-| **Answer Relevancy** | **0.903** | 12 of 14 |
-| **Faithfulness** | **0.651** | 8 |
-| **Context Precision** | **0.667** | 3 |
-
-> Answer Relevancy excludes 2 entries where the agent correctly refused to answer — these score 0.0 by RAGAS design. The 0.903 reflects actual answer quality on questions the agent did answer. Evaluated using LLaMA 3.3 70B as judge.
+| Metric | Sample Size ($N$) | Mean Score | Median Score | Key Engineering Insight |
+|---|---|---|---|---|
+| **Context Precision** | 11 retrieval queries | **0.9091** | **1.0000** | Cross-Encoder reranking (`ms-marco`) + thresholding ($-2.5$ logit cutoff) ranks top relevant chunks at rank 1. |
+| **Faithfulness** | 30 context queries | **0.7633** | **0.8167** | Grounded system prompt prevents parametric hallucinations during multi-step answer synthesis. |
+| **Answer Relevancy** | 47 answer queries | **0.6824** | **0.8356** | High directness on core queries; mean reflects deliberate refusal paths on temporal 2026 missing-context queries. |
 
 ---
 
-## 🚢 Deployment
-
-**Streamlit Community Cloud** — the Streamlit UI (`app.py`) is deployed publicly with node-level streaming so each tool firing appears in real time.
-
-**FastAPI** — `main.py` wraps the same LangGraph agent and exposes `GET /health` and `POST /query`. The graph is built once at startup via FastAPI's `lifespan` context, Pydantic models validate all requests and responses, and structured error handling ensures raw tracebacks never reach the caller. Verified locally — `/health` returns `graph_loaded: true`, `/query` returns structured JSON with `final_answer`, `tools_used`, `routing_reason`, `sufficient`, and `missing_info`.
-
-**Docker** — the FastAPI app is fully Dockerized (Python 3.12-slim) and verified end-to-end locally with the agent running inside the container. HuggingFace Spaces Docker SDK now requires a paid subscription, so the public demo runs on Streamlit Cloud instead. The Docker image remains the artifact for any container-based deployment.
-
----
-
-## 📡 API Reference
+## 📡 API Reference & Endpoints
 
 ### `GET /health`
+
 ```json
 {"status": "ok", "graph_loaded": true}
 ```
 
 ### `POST /query`
+
 ```bash
 curl -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
@@ -103,13 +88,13 @@ curl -X POST http://localhost:8000/query \
 {
   "final_answer": "The Transformer uses scaled dot-product attention...",
   "tools_used": ["retrieval"],
-  "routing_reason": "Question is about specific facts from the local corpus",
+  "routing_reason": "Question asks about specific facts from an ML paper",
   "sufficient": true,
   "missing_info": ""
 }
 ```
 
-Interactive docs at `http://localhost:8000/docs` when running locally.
+Interactive Swagger documentation is available at `http://localhost:8000/docs` when running FastAPI locally or inside Docker.
 
 ---
 
@@ -117,91 +102,73 @@ Interactive docs at `http://localhost:8000/docs` when running locally.
 
 | Layer | Technology |
 |---|---|
-| **Agent Framework** | LangGraph (StateGraph, conditional edges, operator.add accumulation) |
-| **LLM — Router** | LLaMA 3.1 8B via Groq API |
-| **LLM — Eval + Synthesis** | LLaMA 3.3 70B via Groq API |
-| **Embeddings** | all-MiniLM-L6-v2 (Sentence Transformers) |
-| **Vector Store** | FAISS (CPU) |
-| **Keyword Search** | BM25 (rank-bm25) |
-| **Retrieval Fusion** | LangChain EnsembleRetriever |
-| **Reranking** | ms-marco-MiniLM-L-6-v2 (Cross-Encoder) |
-| **Web Search** | Tavily API |
-| **Calculator** | numexpr (safe arithmetic — no eval()) |
-| **Evaluation** | RAGAS + custom routing accuracy framework |
-| **Observability** | LangSmith |
-| **API** | FastAPI + Uvicorn |
-| **UI** | Streamlit (node-level streaming) |
-| **Containerization** | Docker (Python 3.12-slim) |
-| **Deployment** | Streamlit Community Cloud |
+| Agent Framework | LangGraph (StateGraph, conditional edges, `operator.add` accumulation) |
+| LLM Engine | LLaMA 3.3 70B & LLaMA 3.1 8B via Groq API (Key Rotation Fallback) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Vector Store | FAISS CPU (Disk cached with SHA-256 `chunks.json` validation) |
+| Keyword Search | BM25 (`rank-bm25`) |
+| Retrieval Fusion | LangChain `EnsembleRetriever` (50/50 BM25 + FAISS) |
+| Reranking & Filtering | Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) with $-2.5$ logit score cutoff |
+| Web Search | Tavily Search API |
+| Calculator | `numexpr` (AST-parsed mathematical evaluator — safe from `eval()` injection) |
+| Evaluation | RAGAS 0.2.x + custom benchmark suite |
+| Backend API | FastAPI + Uvicorn |
+| UI | Streamlit (Native node-level event streaming) |
+| Containerization | Docker (Python 3.12-slim) |
+| Deployment | Streamlit Community Cloud |
 
 ---
 
-## 📄 Local Corpus
+## 📄 Local Research Corpus
 
-725 chunks across 5 foundational ML papers, section-aware chunked (no chunk straddles a section boundary):
+Ingested 45 ArXiv Machine Learning Papers (~5,500+ chunks) covering Transformer architectures, PEFT / LoRA fine-tuning, diffusion probabilistic models, and optimization.
 
-| Paper | Sections |
-|---|---|
-| Attention Is All You Need | 9 |
-| ResNet | 7 |
-| BERT | 7 |
-| DDPM | 8 |
-| GPT-3 | 11 |
+**Section-Aware Chunking:** Uses custom header regex patterns in `src/ingest.py` to split papers into sections before chunking (`RecursiveCharacterTextSplitter`, size 800 / overlap 150), guaranteeing no chunk straddles section boundaries while retaining paper, author, page, and section metadata.
 
 ---
 
 ## ⚙️ Local Setup
 
 ```bash
-# Clone and install
+# 1. Clone repository & setup virtual environment
 git clone https://github.com/kforkandarp/agentic-research-assistant.git
 cd agentic-research-assistant
-python -m venv venv && venv\Scripts\activate
+python -m venv venv
+
+# PowerShell (Windows):
+.\venv\Scripts\Activate
+# Linux / macOS:
+source venv/bin/activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Create .env
-GROQ_API_KEY=your_groq_key
+# 3. Configure Environment Variables (.env)
+GROQ_API_KEY1=your_primary_groq_key
+GROQ_API_KEY2=your_secondary_groq_key
 TAVILY_API_KEY=your_tavily_key
-LANGCHAIN_API_KEY=your_langsmith_key
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_PROJECT=agentic-research-assistant
 
-# Chunk your PDFs (add them to data/raw_pdfs/ first)
-python -m src.chunking
+# 4. Ingest Corpus & Build FAISS Index
+python -m src.ingest
 
-# Run Streamlit UI
+# 5. Run Streamlit UI
 streamlit run app.py
 
-# OR run FastAPI
-uvicorn main:app --host 0.0.0.0 --port 8000
+# 6. OR Run FastAPI Backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
-## 🐳 Docker
+## 🐳 Docker Containerization
 
 ```bash
-# Build
+# Build Docker image
 docker build -t agentic-research-assistant .
 
-# Run (PowerShell)
-docker run -p 8000:7860 --env-file .env -v "${PWD}/data:/app/data" agentic-research-assistant
-
-# Run (CMD)
-docker run -p 8000:7860 --env-file .env -v "%cd%/data:/app/data" agentic-research-assistant
+# Run container (FastAPI on port 8000)
+docker run -p 8000:8000 --env-file .env agentic-research-assistant
 ```
-
----
-
-## 🔮 Future Improvements
-
-- **HuggingFace Spaces** — deploy Docker image once on a paid plan for a public API endpoint
-- **Load testing** — k6/Locust benchmarks against FastAPI reporting p50/p95 latency
-- **Streaming FastAPI** — WebSocket or SSE endpoint for token-level streaming via REST
-- **FAISS persistence** — pre-build and store the index to eliminate cold-start rebuild
-- **Larger RAGAS judge** — re-run evaluation with GPT-4o for more reliable scores
-- **Expand eval set** — current 19 questions sufficient for development; expand to 50+ for production confidence
-- **Multi-corpus support** — extend beyond fixed 5 papers to user-uploaded PDFs
 
 ---
 
