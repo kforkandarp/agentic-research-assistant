@@ -145,13 +145,13 @@ html, body, [class*="css"] {
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 TOOL_META = {
-    "retrieval":    {"icon": "📄", "label": "retrieval",    "desc": "searching local ArXiv corpus (BM25 + FAISS + rerank)", "css": "tool-retrieval"},
-    "web_search":   {"icon": "🌐", "label": "web_search",   "desc": "searching the web via Tavily",                          "css": "tool-web_search"},
-    "calculator":   {"icon": "🧮", "label": "calculator",   "desc": "extracting and evaluating arithmetic expression",        "css": "tool-calculator"},
-    "direct_answer":{"icon": "💬", "label": "direct_answer","desc": "answering from LLM knowledge — no tool needed",          "css": "tool-direct_answer"},
+    "retrieval":    {"icon": "📄", "label": "retrieval",    "desc": "searching ArXiv corpus (BM25 + FAISS + rerank thresholding)", "css": "tool-retrieval"},
+    "web_search":   {"icon": "🌐", "label": "web_search",   "desc": "searching the live web via Tavily API",                      "css": "tool-web_search"},
+    "calculator":   {"icon": "🧮", "label": "calculator",   "desc": "extracting and evaluating math expression via numexpr",       "css": "tool-calculator"},
+    "direct_answer":{"icon": "💬", "label": "direct_answer","desc": "answering from general LLM knowledge — no tool needed",      "css": "tool-direct_answer"},
 }
 
-CORPUS_PAPERS = ["Attention Is All You Need", "ResNet", "BERT", "DDPM", "GPT-3"]
+CORPUS_PAPERS = ["Attention Is All You Need", "ResNet", "BERT", "DDPM", "GPT-3", "+ 40 Ingested ArXiv Papers (~5,500 Chunks)"]
 
 # ── Graph — built once, reused across all queries ─────────────────────────────
 @st.cache_resource(show_spinner=False)
@@ -212,7 +212,7 @@ def answer_html(text: str, sufficient: bool) -> str:
 st.markdown("""
 <div class="page-header">
     <h1>🔬 Agentic Research Assistant</h1>
-    <p>LangGraph · Groq · BM25 + FAISS + rerank · Tavily · numexpr</p>
+    <p>LangGraph · Groq · BM25 + FAISS + Cross-Encoder · Tavily · numexpr</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -287,13 +287,10 @@ if run_clicked and query.strip():
 
                 # ── Tool node fired ───────────────────────────────────────
                 elif node_name in TOOL_META:
-                    # node_output["tool_outputs"] is a list with ONE new record
-                    # (operator.add appends, so each node only returns its own)
                     new_records = node_output.get("tool_outputs", [])
                     for rec in new_records:
                         steps.append({"tool": rec["tool"]})
 
-                    # Show trace with pulsing dot on latest step
                     trace_label_ph.markdown(
                         '<div class="section-label">Reasoning trace</div>',
                         unsafe_allow_html=True,
@@ -307,7 +304,6 @@ if run_clicked and query.strip():
                 elif node_name == "evaluate":
                     grade_sufficient = node_output.get("_grade_sufficient", True)
                     missing_info     = node_output.get("missing_info", "")
-                    # Redraw trace without pulsing dot — tool finished, evaluate ran
                     trace_ph.markdown(
                         trace_html(steps, active=False),
                         unsafe_allow_html=True,
@@ -316,12 +312,10 @@ if run_clicked and query.strip():
                 # ── Synthesize fired ──────────────────────────────────────
                 elif node_name == "synthesize":
                     final_answer = node_output.get("final_answer", "")
-                    # Remove pulsing dot from trace — we're done
                     trace_ph.markdown(
                         trace_html(steps, active=False),
                         unsafe_allow_html=True,
                     )
-                    # Render answer
                     divider_ph.markdown('<hr class="trace-divider">', unsafe_allow_html=True)
                     answer_label_ph.markdown(
                         '<div class="section-label">Answer</div>',

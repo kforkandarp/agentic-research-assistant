@@ -12,36 +12,22 @@ class RouterDecision(BaseModel):
 
 
 def _build_router_prompt() -> str:
-    """Reads the paper list from chunks.json at import time so the prompt
-    stays in sync with the actual corpus automatically."""
     try:
         import json
         with open("data/chunks.json", "r", encoding="utf-8") as f:
             chunks = json.load(f)
-        papers = sorted(set(c["paper"] for c in chunks))
-        paper_list = "\n  ".join(f"- {p}" for p in papers)
+        papers = sorted(set(c["paper"] for c in chunks if c.get("paper")))
+        paper_list = "\n  ".join(f"- {p}" for p in papers[:20]) # List top ingested papers
     except Exception:
-        paper_list = "(could not load corpus — treat all paper questions as retrieval)"
+        paper_list = "(local paper corpus loaded)"
 
     return f"""You are a routing agent for a research assistant over ArXiv ML papers.
 Given a user's question, decide which ONE tool should handle it first:
 
-- "retrieval": question is about specific facts, numbers, or content from these papers
-  in the local corpus:
-  {paper_list}
-  If the question explicitly mentions a paper or model NOT in this list, use "web_search".
-  If the question asks about something "recent", "current", "latest", or from a specific
-  year that implies it post-dates these papers, use "web_search".
-- "web_search": question needs current/recent information, or is about anything outside
-  the papers listed above
-- "calculator": the user's PRIMARY TASK is performing a numerical computation with known
-  numbers (e.g. "what is 15% of 2340", "how many times bigger is X than Y").
-  Do NOT choose calculator for questions that EXPLAIN or NAME a formula/concept —
-  route those to "direct_answer" or "retrieval" instead.
-- "direct_answer": question is general ML knowledge the LLM already knows, no tool needed.
-  Also use direct_answer for questions that are clearly unanswerable by any tool — future
-  predictions, hypotheticals, or questions explicitly framed as unanswerable. Do not send
-  these to web_search hoping to find an answer that cannot exist.
+- "retrieval": The question asks about specific facts, architecture details, hyperparameters, or metrics from an ML paper, OR explicitly mentions a paper name (e.g., Transformer, ResNet, BERT, DDPM, GPT-3, LoRA). ALWAYS use retrieval when a paper name or core paper concept is mentioned.
+- "web_search": The question asks about recent events, current state-of-the-art leaderboards, software versions, news, or work from 2025/2026.
+- "calculator": The question is a PURE mathematical computation problem with raw numbers already given in the prompt (e.g., "what's 15% of 2340", "compute 2^16 / 8"). Do NOT use calculator if numbers need to be looked up from a paper first.
+- "direct_answer": The question asks for general, high-level ML definitions or explanations (e.g., "what is overfitting", "difference between precision and recall", "what is gradient descent") that do NOT depend on a specific paper. Also use for general geography/knowledge.
 """
 
 ROUTER_SYSTEM_PROMPT = _build_router_prompt()
@@ -65,22 +51,3 @@ def router_node(state: AgentState) -> dict:
         reason = f"Structured routing failed ({e}); defaulting to direct answer."
 
     return {"next_tool": tool, "routing_reason": reason}
-
-
-if __name__ == "__main__":
-    test_cases = [
-        "What is the BLEU score of the base Transformer model?",
-        "What is the current SOTA on GLUE this month?",
-        "What's 15% of 2340?",
-        "What is overfitting in machine learning?",
-    ]
-
-    for query in test_cases:
-        state: AgentState = {
-            "query": query, "next_tool": None, "routing_reason": None,
-            "tool_outputs": [], "final_answer": None,
-            "missing_info": "", "_grade_sufficient": True,
-        }
-        update = router_node(state)
-        print(f"Query: {query}")
-        print(f"  -> Tool: {update['next_tool']} | Reason: {update['routing_reason']}\n")

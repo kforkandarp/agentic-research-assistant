@@ -1,41 +1,76 @@
 """
+src/ragas_eval.py
 RAGAS evaluation for the Agentic Research Assistant.
-
-Metrics and their scope:
-  - answer_relevancy:   13 questions — every entry where agent produced a real answer.
-                        Does not need contexts or ground_truth.
-  - faithfulness:       6 questions  — entries where retrieval/web_search ran and
-                        returned contexts. Checks synthesizer grounding. (and hallucinations)
-  - context_precision:  3 questions  — pure retrieval entries with ground_truth only.
-                        Multi-step excluded (mixed retrieval+web_search context blob
-                        makes scores uninterpretable).
-
-Metric NOT used:
-  - context_recall: Corpus is intentionally fixed at 5 papers. Low recall reflects
-                    corpus scope not retriever failure — not an actionable metric here.
-
-Reads from eval/eval_results_with_gt.json — static file, never overwritten by run_eval.py.
-
-Run modes:
-  python -m src.ragas_eval                  # pilot: representative sample, all 3 metrics
-  python -m src.ragas_eval --all            # full run: all eligible per metric
+Evaluates Answer Relevancy, Faithfulness, and Context Precision.
 """
 
 import json
 import sys
+import os
 import pandas as pd
 from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import faithfulness, answer_relevancy, context_precision
-from ragas.llms import LangchainLLMWrapper
+from ragas.llms import BaseRagasLLM, LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from langchain_huggingface import HuggingFaceEmbeddings
-from src.llm import get_llm
+from langchain_groq import ChatGroq
+from dotenv import load_dotenv
+from ragas.run_config import RunConfig
+
+
+load_dotenv()
 
 RESULTS_PATH = "eval/eval_results_with_gt.json"
 RAGAS_OUTPUT_PATH = "eval/ragas_results.csv"
-PILOT_SIZE = 4  # per metric group — keeps total judge calls manageable
+PILOT_SIZE = 4  # per metric group for developer testing
 
+
+# ── RAGAS LLM ADAPTER FIX ─────────────────────────────────────────────────────
+# RAGAS 0.2.x inspects .temperature directly on LLM wrappers.
+# Wrapping ChatGroq in this custom class guarantees RAGAS always gets a clean
+# .temperature attribute without throwing RunnableWithFallbacks errors.
+
+class DirectGroqRagasLLM(BaseRagasLLM):
+    def __init__(self, temperature: float = 0.0):
+        super().__init__()
+        api_key = (
+            os.getenv("GROQ_API_KEY1")
+            or os.getenv("GROQ_API_KEY")
+            or os.getenv("GROQ_API_KEY2")
+        )
+        if not api_key:
+            raise ValueError("No Groq API key found in environment variables.")
+            
+        self._temperature = temperature
+        # Use llama-3.1-8b-instant to prevent Groq TPM (Tokens Per Minute) 429 errors during parallel judging
+        self.langchain_llm = ChatGroq(
+            model_name="llama-3.1-8b-instant",
+            temperature=temperature,
+            groq_api_key=api_key,
+        )
+        self.wrapper = LangchainLLMWrapper(self.langchain_llm)
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
+
+    # Suppresses the 'is_finished not implemented' logging warnings
+    def is_finished(self, response) -> bool:
+        return True
+
+    def generate_text(self, prompt, n=1, temperature=None, stop=None, callbacks=None):
+        return self.wrapper.generate_text(
+            prompt, n=n, temperature=temperature, stop=stop, callbacks=callbacks
+        )
+
+    async def agenerate_text(self, prompt, n=1, temperature=None, stop=None, callbacks=None):
+        return await self.wrapper.agenerate_text(
+            prompt, n=n, temperature=temperature, stop=stop, callbacks=callbacks
+        )
+
+
+# ── DATA LOADING & FILTERS ────────────────────────────────────────────────────
 
 def load_results() -> list[dict]:
     with open(RESULTS_PATH, "r", encoding="utf-8") as f:
@@ -43,12 +78,6 @@ def load_results() -> list[dict]:
 
 
 def get_answer_relevancy_entries(results: list[dict], use_all: bool) -> list[dict]:
-    """
-    answer_relevancy: needs question + answer only.
-    Eligible: any entry where agent produced a real answer.
-    Excluded: insufficient_information (honest I-dont-know, no claim to score)
-              and error entries.
-    """
     eligible = [
         r for r in results
         if r["actual_category"].lower() not in ("insufficient_information", "error")
@@ -58,12 +87,6 @@ def get_answer_relevancy_entries(results: list[dict], use_all: bool) -> list[dic
 
 
 def get_faithfulness_entries(results: list[dict], use_all: bool) -> list[dict]:
-    """
-    faithfulness: needs question + answer + contexts.
-    Eligible: entries where retrieval or web_search ran and saved contexts.
-    Excluded: calculator-only, direct_answer-only (no retrieved context to ground against),
-              insufficient_information (no meaningful answer to check).
-    """
     eligible = [
         r for r in results
         if r["actual_category"].lower() not in ("insufficient_information", "error")
@@ -74,18 +97,12 @@ def get_faithfulness_entries(results: list[dict], use_all: bool) -> list[dict]:
 
 
 def get_context_precision_entries(results: list[dict], use_all: bool) -> list[dict]:
-    """
-    context_precision: needs question + answer + contexts + ground_truth.
-    Eligible: pure retrieval entries with ground_truth only.
-    Multi-step excluded: their contexts field is a concatenation of retrieval
-    output and web_search output. context_precision cannot distinguish which
-    chunks came from which tool — scores would conflate retriever quality with
-    Tavily quality, making them uninterpretable.
-    """
     eligible = [
         r for r in results
-        if r["actual_category"] == "retrieval"
+        if r.get("expected_tool") == "retrieval"
+        and r.get("actual_category") != "error"
         and r.get("contexts")
+        and len(r.get("contexts", [])) > 0
         and r.get("ground_truth")
         and r.get("final_answer")
     ]
@@ -94,11 +111,10 @@ def get_context_precision_entries(results: list[dict], use_all: bool) -> list[di
 
 def run_metric(entries: list[dict], metrics: list, dataset_dict: dict,
                judge_llm, judge_embeddings, label: str) -> dict:
-    """Runs a single RAGAS evaluate() call and returns scores as a dict."""
-    if not entries: # if our evaluation dataset is empty, RAGAS will throw an error. Skip and return empty dict. this is early exit
+    if not entries:
         print(f"[SKIP] {label} — no eligible entries.")
         return {}
-    # creating ids to prvnt traceability since ragas schema only takes question/ans/contexts/ground_truth, not ids.
+
     ids = [r["id"] for r in entries]
     print(f"\n[{label}] scoring {len(ids)} questions: {ids}")
 
@@ -108,25 +124,27 @@ def run_metric(entries: list[dict], metrics: list, dataset_dict: dict,
         metrics=metrics,
         llm=judge_llm,
         embeddings=judge_embeddings,
+        run_config=RunConfig(
+            max_workers=1,
+            max_retries=10,
+            timeout=180
+        )
     )
 
-    scores = {} # this dict acts as a collector for scores of each metric.
+    scores = {}
     try:
         for m in metrics:
             val = result[m.name]
-            # ragas 0.2.x returns a list of per-question scores, not an aggregate float
             score = sum(val) / len(val) if isinstance(val, list) else float(val)
             scores[m.name] = score
         for name, score in scores.items():
             print(f"  {name}: {score:.4f}")
-    except Exception as e:
+    except Exception:
         print(f"  Raw: {result}")
 
-    # Attach question IDs to per-question rows
-    # since we also need per-question scores for debugging and analysis
     try:
         df = result.to_pandas()
-        df.insert(0, "question_id", ids) # pandas inserts ids list that we extracted earlier as a new column in df dataframe
+        df.insert(0, "question_id", ids)
         scores["_df"] = df
     except Exception:
         pass
@@ -135,22 +153,23 @@ def run_metric(entries: list[dict], metrics: list, dataset_dict: dict,
 
 
 def run_ragas():
-    use_all = "--all" in sys.argv  # true or false
+    use_all = "--all" in sys.argv
     mode = "all eligible entries" if use_all else f"pilot ({PILOT_SIZE} per metric)"
     print(f"=== RAGAS Evaluation — {mode} ===")
 
     results = load_results()
 
-    judge_llm = LangchainLLMWrapper(get_llm(temperature=0.0)) # since ragas doesnt understand Langchain LLMs we wrap it in a LangchainLLMWrapper.
-    # get_llm() is a function that returns a LLM object with temperature=0.0 (deterministic output)
+    # Instantiate our custom adapter that explicitly exposes .temperature to RAGAS
+    judge_llm = DirectGroqRagasLLM(temperature=0.0)
+
     judge_embeddings = LangchainEmbeddingsWrapper(
         HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     )
 
-    all_dfs = [] # Each call to run_metric() also returns a DataFrame containing per-question scores.
+    all_dfs = []
     all_scores = {}
 
-    # ── 1. answer_relevancy ──────────────────────────────────────────────────
+    # 1. answer_relevancy
     ar_entries = get_answer_relevancy_entries(results, use_all)
     ar_scores = run_metric(
         entries=ar_entries,
@@ -158,9 +177,6 @@ def run_ragas():
         dataset_dict={
             "question": [r["question"] for r in ar_entries],
             "answer":   [r["final_answer"] for r in ar_entries],
-            # answer_relevancy uses embeddings on question+answer only.
-            # contexts field must still be present in dataset for ragas API
-            # but is not used in scoring — pass empty list per entry.
             "contexts": [[] for _ in ar_entries],
         },
         judge_llm=judge_llm,
@@ -171,7 +187,7 @@ def run_ragas():
     if "_df" in ar_scores:
         all_dfs.append(ar_scores["_df"])
 
-    # ── 2. faithfulness ──────────────────────────────────────────────────────
+    # 2. faithfulness
     fa_entries = get_faithfulness_entries(results, use_all)
     fa_scores = run_metric(
         entries=fa_entries,
@@ -189,7 +205,7 @@ def run_ragas():
     if "_df" in fa_scores:
         all_dfs.append(fa_scores["_df"])
 
-    # ── 3. context_precision ─────────────────────────────────────────────────
+    # 3. context_precision
     cp_entries = get_context_precision_entries(results, use_all)
     cp_scores = run_metric(
         entries=cp_entries,
@@ -208,12 +224,10 @@ def run_ragas():
     if "_df" in cp_scores:
         all_dfs.append(cp_scores["_df"])
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     print("\n=== Final RAGAS Scores ===")
     for metric, score in all_scores.items():
         print(f"  {metric}: {score:.4f}")
 
-    # Save per-question breakdown
     try:
         combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
         combined.to_csv(RAGAS_OUTPUT_PATH, index=False)

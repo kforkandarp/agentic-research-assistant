@@ -1,35 +1,30 @@
+# Environment & Secrets
 .env
 .env.*
 
-
+# Python Virtual Environments & Caches
 venv/
 .venv/
-
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
 
+# Raw downloads, temporary outputs & legacy sets
 data/raw_pdfs/
+eval/ragas_results.csv
+eval/holdout_*
 
-
-eval/
-
-
-tests/
-
-
+# Git & IDE configurations
 .git/
 .gitignore
-
-
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-
+# Jupyter Notebooks & Logs
 *.ipynb
 .ipynb_checkpoints/
-
 *.log
 logs/

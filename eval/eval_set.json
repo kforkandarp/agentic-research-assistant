@@ -3,114 +3,300 @@
     "id": "q01",
     "question": "What method does the paper 'Attention Is All You Need' use to handle word order without recurrence?",
     "expected_tool": "retrieval",
-    "notes": "Answerable purely from the local ArXiv corpus if that paper is ingested."
+    "notes": "Answerable purely from the local ArXiv corpus."
   },
   {
     "id": "q02",
     "question": "What is the BLEU score reported for the base Transformer model on WMT 2014 English-to-German translation?",
     "expected_tool": "retrieval",
-    "notes": "Specific numeric fact from a paper — tests retrieval precision."
+    "notes": "Specific numeric fact from paper."
   },
   {
     "id": "q03",
     "question": "Has there been any notable follow-up work published in 2026 building on the original LoRA paper?",
     "expected_tool": "web_search",
-    "notes": "Explicitly asks about recent work outside a fixed corpus — should force web_search, not retrieval."
+    "notes": "Explicitly asks about recent work outside fixed paper set."
   },
   {
     "id": "q04",
     "question": "What is the current state-of-the-art model on the GLUE benchmark as of this month?",
     "expected_tool": "web_search",
-    "notes": "Time-sensitive leaderboard fact — local corpus will be stale."
+    "notes": "Time-sensitive leaderboard fact."
   },
   {
     "id": "q05",
     "question": "If a model has 175 billion parameters and each parameter uses 2 bytes in FP16, how much memory is needed just to store the weights, in GB?",
     "expected_tool": "calculator",
-    "notes": "Pure arithmetic, no retrieval needed even though it's ML-flavored."
+    "notes": "Pure arithmetic, no retrieval needed."
   },
   {
     "id": "q06",
     "question": "What is the definition of overfitting in machine learning?",
     "expected_tool": "direct_answer",
-    "notes": "General knowledge the LLM already has — no tool needed. Router should NOT call retrieval here."
+    "notes": "General ML knowledge."
   },
   {
     "id": "q07",
     "question": "In plain terms, what's the difference between precision and recall?",
     "expected_tool": "direct_answer",
-    "notes": "Another general-knowledge check, deliberately similar to q06 to test consistency."
+    "notes": "General knowledge check."
   },
   {
     "id": "q08",
     "question": "According to the ResNet paper, what is the top-1 error rate improvement of ResNet-152 over VGG-19 on ImageNet? Compute that as a percentage reduction.",
     "expected_tool": "multi_step",
-    "notes": "Retrieve both numbers from the paper, THEN calculate the percentage — tests tool-chaining."
+    "notes": "Retrieve two numbers then calculate percentage."
   },
   {
     "id": "q09",
     "question": "Find the throughput reported for the base and big Transformer models in the original paper, and tell me how many times faster the big model's training FLOPs are compared to base.",
     "expected_tool": "multi_step",
-    "notes": "Another retrieve-then-calculate case."
+    "notes": "Retrieve-then-calculate case."
   },
   {
     "id": "q10",
     "question": "What optimizer and learning rate schedule did the BERT paper use, and has anyone published a more compute-efficient alternative since 2025?",
     "expected_tool": "multi_step",
-    "notes": "retrieval for the first half, web_search for the second — tests whether the agent can split a compound question."
+    "notes": "Retrieval for first half, web_search for second half."
   },
   {
     "id": "q11",
     "question": "What is the capital of France?",
     "expected_tool": "direct_answer",
-    "notes": "Deliberately irrelevant to ML/ArXiv — tests that router doesn't force everything into retrieval just because the corpus exists."
+    "notes": "Irrelevant query sanity check."
   },
   {
     "id": "q12",
     "question": "Summarize the main contribution of the paper on Denoising Diffusion Probabilistic Models.",
     "expected_tool": "retrieval",
-    "notes": "Standard single-document summarization retrieval case."
+    "notes": "Standard single-document summarization."
   },
   {
     "id": "q13",
     "question": "What's 15% of 2,340?",
     "expected_tool": "calculator",
-    "notes": "Trivial arithmetic, no ML context at all — sanity check for calculator routing."
+    "notes": "Trivial arithmetic."
   },
   {
     "id": "q14",
     "question": "Is there a more recent (2026) survey paper that consolidates work on parameter-efficient fine-tuning methods?",
     "expected_tool": "web_search",
-    "notes": "Explicit recency cue ('2026', 'more recent') should push toward web_search over retrieval."
+    "notes": "Recency cue forces web search."
   },
   {
     "id": "q15",
     "question": "What does the paper report as GPT-3's parameter count, and how does that compare numerically to GPT-2's parameter count (as a multiple)?",
     "expected_tool": "multi_step",
-    "notes": "retrieve two facts (possibly from two different papers) → calculate ratio."
+    "notes": "Retrieve facts then calculate ratio."
   },
   {
     "id": "q16",
     "question": "What is gradient descent, at a high level?",
     "expected_tool": "direct_answer",
-    "notes": "Redundant-looking with q06/q07 on purpose — routing consistency across similar 'explain a concept' phrasings."
+    "notes": "Conceptual ML check."
   },
   {
     "id": "q17",
     "question": "Retrieve the vocabulary size used in the original Transformer paper's tokenizer, and tell me what fraction that is of GPT-3's vocabulary size.",
     "expected_tool": "multi_step",
-    "notes": "One number from local corpus, one number likely needing web_search if GPT-3 paper isn't ingested — tests chaining across tool types, not just retrieval+calculator."
+    "notes": "Retrieval + web_search + calculate chain."
   },
   {
     "id": "q18",
     "question": "This question is intentionally unanswerable from any source: what will next year's ArXiv submission count be?",
     "expected_tool": "insufficient_information",
-    "notes": "Tests the max-retry guardrail fallback path, not a real tool route."
+    "notes": "Tests max-retry guardrail fallback path."
   },
   {
     "id": "q19",
     "question": "tell me something about GPT 5.6",
     "expected_tool": "web_search",
-    "notes": "Information about GPT 5.6 is likely not in the local corpus, so web search is needed."
+    "notes": "Recent model details force web search."
+  },
+  {
+    "id": "q20",
+    "question": "What loss function is used in Denoising Diffusion Probabilistic Models during training?",
+    "expected_tool": "retrieval",
+    "notes": "Corpus fact check."
+  },
+  {
+    "id": "q21",
+    "question": "How many total parameters does BERT-Large have compared to BERT-Base?",
+    "expected_tool": "multi_step",
+    "notes": "Retrieve both parameter counts and compute difference."
+  },
+  {
+    "id": "q22",
+    "question": "What is 256 multiplied by 1024, and what is that in megabytes if each unit is 1 byte?",
+    "expected_tool": "calculator",
+    "notes": "Pure calculation."
+  },
+  {
+    "id": "q23",
+    "question": "Explain the concept of learning rate warmup in neural network training.",
+    "expected_tool": "direct_answer",
+    "notes": "Direct ML explanation."
+  },
+  {
+    "id": "q24",
+    "question": "What are the latest AI safety guidelines announced by major labs in late 2025 or 2026?",
+    "expected_tool": "web_search",
+    "notes": "Time-sensitive external search."
+  },
+  {
+    "id": "q25",
+    "question": "What pre-training tasks were used in the original BERT paper?",
+    "expected_tool": "retrieval",
+    "notes": "Corpus facts on MLM and NSP."
+  },
+  {
+    "id": "q26",
+    "question": "Compute 2 to the power of 16 divided by 8.",
+    "expected_tool": "calculator",
+    "notes": "Arithmetic check."
+  },
+  {
+    "id": "q27",
+    "question": "What is cross-entropy loss in machine learning?",
+    "expected_tool": "direct_answer",
+    "notes": "Direct general knowledge."
+  },
+  {
+    "id": "q28",
+    "question": "What recent breakthroughs in multimodal vision-language models occurred in 2026?",
+    "expected_tool": "web_search",
+    "notes": "Recency cue."
+  },
+  {
+    "id": "q29",
+    "question": "According to the ResNet paper, what residual mapping is learned by the building blocks?",
+    "expected_tool": "retrieval",
+    "notes": "Corpus structural mapping question."
+  },
+  {
+    "id": "q30",
+    "question": "If a dataset has 50,000 images and batch size is 64, how many full steps are in one epoch?",
+    "expected_tool": "calculator",
+    "notes": "Pure arithmetic calculation."
+  },
+  {
+    "id": "q31",
+    "question": "What is the difference between supervised and unsupervised learning?",
+    "expected_tool": "direct_answer",
+    "notes": "Direct ML definition."
+  },
+  {
+    "id": "q32",
+    "question": "What is the current version of PyTorch released recently in 2026?",
+    "expected_tool": "web_search",
+    "notes": "External software version check."
+  },
+  {
+    "id": "q33",
+    "question": "How many attention heads are used in the Transformer-Big model according to Attention Is All You Need?",
+    "expected_tool": "retrieval",
+    "notes": "Specific hyperparameter fact."
+  },
+  {
+    "id": "q34",
+    "question": "What is 1024 times 768 times 3 divided by 1,000,000 to get size in Megapixels?",
+    "expected_tool": "calculator",
+    "notes": "Image resolution math."
+  },
+  {
+    "id": "q35",
+    "question": "What is the purpose of dropout in deep neural networks?",
+    "expected_tool": "direct_answer",
+    "notes": "General concept explanation."
+  },
+  {
+    "id": "q36",
+    "question": "Search for recent benchmark results on the MMLU-Pro dataset in 2026.",
+    "expected_tool": "web_search",
+    "notes": "Explicit web search instruction."
+  },
+  {
+    "id": "q37",
+    "question": "What dataset was used for fine-tuning in the GPT-3 paper for few-shot translation?",
+    "expected_tool": "retrieval",
+    "notes": "Paper details check."
+  },
+  {
+    "id": "q38",
+    "question": "Calculate (88.4 - 80.2) / 80.2 * 100 to find the percentage increase.",
+    "expected_tool": "calculator",
+    "notes": "Explicit percentage calculation."
+  },
+  {
+    "id": "q39",
+    "question": "Explain how residual connections help prevent exploding or vanishing gradients.",
+    "expected_tool": "direct_answer",
+    "notes": "Direct architectural concept."
+  },
+  {
+    "id": "q40",
+    "question": "What are the latest open-weight models released by Mistral AI in recent months?",
+    "expected_tool": "web_search",
+    "notes": "Recent industry releases search."
+  },
+  {
+    "id": "q41",
+    "question": "According to DDPM, how many noise steps T were used during training?",
+    "expected_tool": "retrieval",
+    "notes": "Diffusion hyperparameter fact."
+  },
+  {
+    "id": "q42",
+    "question": "What is 3.5 days converted to total training hours?",
+    "expected_tool": "calculator",
+    "notes": "Time unit conversion."
+  },
+  {
+    "id": "q43",
+    "question": "What is the difference between L1 and L2 regularization?",
+    "expected_tool": "direct_answer",
+    "notes": "Direct ML definition."
+  },
+  {
+    "id": "q44",
+    "question": "Find news about recent quantum computing hardware announcements in 2026.",
+    "expected_tool": "web_search",
+    "notes": "External news check."
+  },
+  {
+    "id": "q45",
+    "question": "What activation function is used in BERT's intermediate layers according to the paper?",
+    "expected_tool": "retrieval",
+    "notes": "GELU activation fact check."
+  },
+  {
+    "id": "q46",
+    "question": "Calculate 300,000 steps times 1.0 seconds per step converted to days.",
+    "expected_tool": "calculator",
+    "notes": "Arithmetic step calculation."
+  },
+  {
+    "id": "q47",
+    "question": "What is self-attention in the context of Transformer models?",
+    "expected_tool": "direct_answer",
+    "notes": "Direct architectural concept."
+  },
+  {
+    "id": "q48",
+    "question": "What are the top AI conferences scheduled for late 2026?",
+    "expected_tool": "web_search",
+    "notes": "Conference schedule search."
+  },
+  {
+    "id": "q49",
+    "question": "What is the embedding dimension d_model in the base Transformer paper?",
+    "expected_tool": "retrieval",
+    "notes": "Standard hyperparameter fact."
+  },
+  {
+    "id": "q50",
+    "question": "This question is intentionally unanswerable: what will be the exact stock price of NVIDIA in 2030?",
+    "expected_tool": "insufficient_information",
+    "notes": "Future prediction unanswerable guardrail."
   }
 ]

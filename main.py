@@ -31,6 +31,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # logger is an object responsible for sending messages to the logging system.
 
+# --- [ADDED: Suppress third-party HTTP/model log spam] ---
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+# ---------------------------------------------------------
+
 # ── Lifespan — build graph once at startup ────────────────────────────────────
 # asynccontextmanager turns this function into a context manager that FastAPI
 # calls automatically: everything BEFORE `yield` runs at startup,
@@ -53,20 +59,19 @@ async def lifespan(app: FastAPI):
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
+# --- [CHANGED: Updated description to reflect scaled 45-paper corpus] ---
 app = FastAPI(
     title="Agentic Research Assistant",
     description=(
-        "Single-agent LangGraph system over 5 ArXiv ML papers. "
-        "Hybrid retrieval (BM25 + FAISS + rerank), Tavily web search, "
+        "Production LangGraph system over 45 ArXiv ML papers (~5,500+ chunks). "
+        "Hybrid retrieval (BM25 + FAISS + Cross-Encoder rerank), Tavily web search, "
         "calculator, and direct-answer routing — all on Groq."
     ),
     version="1.0.0",
     lifespan=lifespan,
 )
+# ------------------------------------------------------------------------
 
-# CORS — allows browser-based clients (e.g. a React frontend) to call this API.
-# For HuggingFace Spaces, allow_origins=["*"] is fine since it's a public demo.
-# In production with sensitive data, replace "*" with your exact frontend URL.
 
 
 # CORS — not required for the current Streamlit setup (Streamlit is server-side Python,

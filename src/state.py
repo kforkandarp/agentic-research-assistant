@@ -1,16 +1,13 @@
 from typing import TypedDict, Literal, Optional, Annotated
 import operator
 
-
 ToolName = Literal["retrieval", "web_search", "calculator", "direct_answer"]
-
 
 class ToolCallRecord(TypedDict):
     """One tool invocation's result — tagged with WHICH tool produced it,
     not just a raw string, so the synthesizer and future UI can tell them apart."""
     tool: str
     output: str
-
 
 class AgentState(TypedDict):
     """The shared object passed between every node in the graph."""
