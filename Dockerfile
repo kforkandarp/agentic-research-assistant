@@ -26,7 +26,6 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# ── Start Command (FastAPI Backend) ───────────────────────────────────────
-# Runs app.py (FastAPI app) on port 8000
+# Runs main.py (FastAPI app) on port 8000
 # ── Start Command (FastAPI Backend) ───────────────────────────────────────
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

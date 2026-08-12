@@ -8,7 +8,6 @@ can escalate to web_search instead of silently stopping.
 from langgraph.graph import StateGraph, START, END
 from src.state import AgentState
 from src.router import router_node
-from src.evaluate import evaluate_node, evaluate_route_decision
 from src.nodes import (
     retrieval_node,
     web_search_node,
@@ -16,6 +15,7 @@ from src.nodes import (
     direct_answer_node,
     synthesize_node,
 )
+from src.nodes import evaluate_node, evaluate_route_decision
 
 
 def route_decision(state: AgentState) -> str:

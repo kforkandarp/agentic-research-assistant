@@ -29,7 +29,7 @@ COMPUTATION_SIGNAL = re.compile(
 def retrieval_node(state: AgentState) -> dict:
     """Executes hybrid vector/BM25 retrieval over local ArXiv ML paper corpus."""
     query = state["query"]
-    output = retrieval_tool(query)
+    output = retrieval_tool(query) # string since, retrieval_tool returns a string of concatenated evidence
     record = {"tool": "retrieval", "output": output}
     return {"tool_outputs": [record]}
 
@@ -71,7 +71,9 @@ class EvaluationResult(BaseModel):
         description="True ONLY if the evidence fully answers every part of "
         "the question, with nothing left to look up."
     )
+    
     missing: str = Field(default="", description="If insufficient, ONE short sentence naming what's missing.")
+
     next_tool: Optional[Literal["retrieval", "web_search", "calculator"]] = Field(
         default=None, description="If insufficient, which tool addresses what's missing."
     )

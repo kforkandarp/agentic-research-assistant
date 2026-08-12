@@ -31,3 +31,4 @@ Thumbs.db
 .ipynb_checkpoints/
 *.log
 logs/
+assets/desktop.ini

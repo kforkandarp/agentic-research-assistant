@@ -18,8 +18,9 @@ class AgentState(TypedDict):
 
     # Annotated + operator.add: LangGraph APPENDS returned lists here
     # instead of overwriting, so multiple tool calls accumulate.
+    
     tool_outputs: Annotated[list[ToolCallRecord], operator.add]
 
-    final_answer: Optional[str]                  # the synthesized answer, once ready
+    final_answer: Optional[str]                  # the synthesized answer, once ready, ye optional h since at first, its not ready and is none
     missing_info: str                    # what evaluate found missing; empty string if nothing missing
     _grade_sufficient: bool              # internal: was evidence judged sufficient? always set by evaluate_node
