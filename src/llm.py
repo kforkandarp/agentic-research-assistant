@@ -2,7 +2,7 @@
 src/llm.py
 Unified LLM instantiation and resilient invocation wrapper.
 Uses two Groq API keys with automatic failover (Groq Key 1 -> Groq Key 2)
-to double rate-limit quotas while keeping the model (LLaMA 3.3 70B) identical.
+to double rate-limit quotas while keeping the model identical.
 """
 
 import os
@@ -21,7 +21,7 @@ FAST_MODEL_NAME = "openai/gpt-oss-20b"
 
 def get_llm(temperature: float = 0.0):
     """
-    Constructs primary LLaMA 3.3 70B client using GROQ_API_KEY1.
+    Constructs primary client using GROQ_API_KEY1.
     If GROQ_API_KEY2 is present, attaches it as an automatic fallback LLM instance.
     """
     primary_key = os.getenv("GROQ_API_KEY1") or os.getenv("GROQ_API_KEY")
@@ -47,7 +47,7 @@ def get_llm(temperature: float = 0.0):
 
 def get_fast_llm(temperature: float = 0.0):
     """
-    Constructs fast router LLaMA 3.1 8B client with Key 1 -> Key 2 fallback.
+    Constructs fast router client with Key 1 -> Key 2 fallback.
     """
     primary_key = os.getenv("GROQ_API_KEY1") or os.getenv("GROQ_API_KEY")
     secondary_key = os.getenv("GROQ_API_KEY2")
