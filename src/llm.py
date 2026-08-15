@@ -15,8 +15,8 @@ from groq import RateLimitError, APIError
 load_dotenv()
 logger = logging.getLogger("LLMFactory")
 
-MODEL_NAME = "llama-3.3-70b-versatile"
-FAST_MODEL_NAME = "llama-3.1-8b-instant"
+MODEL_NAME = "openai/gpt-oss-120b"
+FAST_MODEL_NAME = "openai/gpt-oss-20b"
 
 
 def get_llm(temperature: float = 0.0):

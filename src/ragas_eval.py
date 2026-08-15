@@ -43,9 +43,9 @@ class DirectGroqRagasLLM(BaseRagasLLM):
             raise ValueError("No Groq API key found in environment variables.")
             
         self._temperature = temperature
-        # Use llama-3.1-8b-instant to prevent Groq TPM (Tokens Per Minute) 429 errors during parallel judging
+        # Use fast llm openai/gpt-oss-20b to prevent Groq TPM (Tokens Per Minute) 429 errors during parallel judging
         self.langchain_llm = ChatGroq(
-            model_name="llama-3.1-8b-instant",
+            model_name="openai/gpt-oss-20b",
             temperature=temperature,
             groq_api_key=api_key,
         )

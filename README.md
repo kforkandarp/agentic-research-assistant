@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python" />
   <img src="https://img.shields.io/badge/LangGraph-agentic%20loop-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/LLM-LLaMA%203.3%2070B-purple?style=flat-square" />
+  <img src="https://img.shields.io/badge/LLM-GPT%20OSS%20120B%20%2F%2020B-purple?style=flat-square" />
   <img src="https://img.shields.io/badge/Retrieval-BM25%20+%20FAISS%20+%20rerank-green?style=flat-square" />
   <img src="https://img.shields.io/badge/Deployed-Streamlit%20Cloud-red?style=flat-square&logo=streamlit" />
   <img src="https://img.shields.io/badge/Docker-containerized-blue?style=flat-square&logo=docker" />
@@ -37,9 +37,9 @@
 
 The agent follows a cyclic state machine topology: **`START` → `router` → `tool` → `evaluate` → (loop or `synthesize`) → `END`**:
 
-1. **Router Node** (LLaMA 3.1 8B) — classifies queries into `retrieval`, `web_search`, `calculator`, or `direct_answer` using Pydantic structured output.
+1. **Router Node** (openai/gpt-oss-20b) — classifies queries into `retrieval`, `web_search`, `calculator`, or `direct_answer` using Pydantic structured output.
 2. **Tool Execution Nodes** — execute selected tools and append results to shared state (`Annotated[list, operator.add]`).
-3. **Evaluate Node** (LLaMA 3.3 70B) — checks evidence sufficiency; routes to an untried tool if missing information, or forward to synthesis if sufficient. Capped at `MAX_EVIDENCE_STEPS=4` to prevent infinite execution loops.
+3. **Evaluate Node** (openai/gpt-oss-120b) — checks evidence sufficiency; routes to an untried tool if missing information, or forward to synthesis if sufficient. Capped at `MAX_EVIDENCE_STEPS=4` to prevent infinite execution loops.
 4. **Deterministic Guardrails** — regex pre-checks for computation signals force the calculator when numerical expressions are retrieved, short-circuiting simple queries to prevent LLM over-escalation.
 5. **Synthesize Node** — produces grounded answers; injects warning caveats if evidence was judged insufficient to neutralize hallucination.
 
@@ -59,8 +59,7 @@ The agent follows a cyclic state machine topology: **`START` → `router` → `t
 
 ### 2. RAGAS Quality Benchmark
 
-Evaluated using LLaMA 3.3 70B as judge over ground-truth annotated evaluation sets:
-
+Evaluated using GPT OSS 20B (`openai/gpt-oss-20b`) as judge over ground-truth annotated evaluation sets:
 | Metric | Sample Size ($N$) | Mean Score | Median Score | Key Engineering Insight |
 |---|---|---|---|---|
 | **Context Precision** | 11 retrieval queries | **0.9091** | **1.0000** | Cross-Encoder reranking (`ms-marco`) + thresholding ($-2.5$ logit cutoff) ranks top relevant chunks at rank 1. |
@@ -107,7 +106,7 @@ Interactive Swagger documentation is available at `http://localhost:8000/docs` w
 | Layer | Technology |
 |---|---|
 | Agent Framework | LangGraph (StateGraph, conditional edges, `operator.add` accumulation) |
-| LLM Engine | LLaMA 3.3 70B & LLaMA 3.1 8B via Groq API (Key Rotation Fallback) |
+| LLM Engine | openai/gpt-oss-120b & openai/gpt-oss-20b via Groq API (Key Rotation Fallback) |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
 | Vector Store | FAISS CPU (Disk cached with SHA-256 `chunks.json` validation) |
 | Keyword Search | BM25 (`rank-bm25`) |

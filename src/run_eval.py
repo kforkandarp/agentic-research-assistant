@@ -3,7 +3,6 @@ src/run_eval.py
 Runs every question in eval/eval_set.json through the compiled graph.
 Resumable: python -m src.run_eval resumes from eval_results.json;
            python -m src.run_eval --fresh wipes prior results and reruns everything.
-Holdout:   python -m src.run_eval --holdout runs the one-shot holdout set.
 """
 
 import json
@@ -24,8 +23,6 @@ logger = logging.getLogger("EvalRunner")
 
 EVAL_SET_PATH = "eval/eval_set.json"
 RESULTS_PATH = "eval/eval_results.json"
-HOLDOUT_SET_PATH = "eval/holdout_set.json"
-HOLDOUT_RESULTS_PATH = "eval/holdout_results.json"
 
 
 def classify_actual(tools_used: list[str], grade_sufficient: bool, expected_tool: str) -> str:
@@ -58,7 +55,7 @@ def classify_actual(tools_used: list[str], grade_sufficient: bool, expected_tool
 def save_results(results: list[dict], path: str = RESULTS_PATH):
     correct = sum(r["routing_correct"] for r in results)
     total = len(results)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8") as f: # creates file if it doesn't exist at path
         json.dump(
             {
                 "routing_accuracy_pct": (correct / total * 100) if total else 0,
@@ -116,7 +113,7 @@ def run_eval():
         eval_set = json.load(f)
 
     results = []
-    successful_ids: set[str] = set()
+    successful_ids: set[str] = set() # store IDs of successful runs to skip on resume; and we choose set because avg time is O(1)
 
     if fresh and os.path.exists(RESULTS_PATH):
         logger.info("[fresh] Discarding previous results, re-running full benchmark suite...")
@@ -138,7 +135,7 @@ def run_eval():
             continue
 
         try:
-            entry = run_single(item, app)
+            entry = run_single(item, app) # entry is also a dictionary
             status = "OK" if entry["routing_correct"] else "MISMATCH"
             print(
                 f"[{status}] {entry['id']} | expected={entry['expected_tool']} | "
