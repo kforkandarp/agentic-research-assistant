@@ -50,14 +50,37 @@ The agent follows a cyclic state machine topology: **`START` → `router` → `t
 ## 📊 Evaluation & Benchmark Results
 
 ### 1. Routing Accuracy
-* **50-Question Benchmark Suite:** **90.0% Routing Accuracy** (45 / 50 questions routed correctly).
+* **50-Question Benchmark Suite:** **94.0% End-to-End System Accuracy** (47 / 50 questions executed and routed correctly).
 * Evaluated across 6 target query types: single-hop paper retrieval, multi-step tool chains (`retrieval` + `calculator` / `web_search`), pure arithmetic, direct machine learning definitions, live web search, and unanswerable corpus queries.
 
 ![Eval Set Results](assets/eval_results.png)
 
 ---
 
-### 2. RAGAS Quality Benchmark
+### 2. Model Tiering Ablation Study ($N=50$)
+
+To empirically validate using `openai/gpt-oss-20b` for intent classification instead of `openai/gpt-oss-120b`, we evaluated both models against an independent, adversarial boundary dataset (`eval/ablation_router_set.json`). This suite tests edge cases including implicit math extraction, out-of-index ML architectures, dynamic 2026 search queries, and unanswerable refusal prompts.
+
+| Configuration | Model Tier | Router Accuracy ($N=50$) | Avg Latency | Cost / 1M Input Tokens |
+|:---|:---|:---:|:---:|:---:|
+| **Homogeneous Baseline** | `openai/gpt-oss-120b` | **88.0%** (44/50) | 5,088.5 ms | $0.150 |
+| **Asymmetric Tiered** | `openai/gpt-oss-20b` | **82.0%** (41/50) | 5,598.8 ms | **$0.075** *(50.0% Reduction)* |
+
+* **Cost-Efficiency Pareto Trade-off:** The asymmetric tiered architecture retains **93.2% of baseline routing accuracy** while cutting router token expenditure by **50.0%**.
+* **Edge-Case Schema Enforcement (`adv_37`):** On highly nuanced parameter-extraction queries, smaller open-weight models can drop function-calling payloads (`HTTP 400 tool_use_failed`). Production resiliency handlers wrap router dispatches in fallback retries to intercept schema drops and maintain system stability.
+
+<details>
+<summary>adv_37 failure log</summary>
+
+![adv_37 error log](assets/adv_37_error_log.png)
+
+</details>
+
+![Model Tiering Ablation Benchmark](assets/ablation_benchmark_table.png)
+
+---
+
+### 3. RAGAS Quality Benchmark
 
 Evaluated using GPT OSS 20B (`openai/gpt-oss-20b`) as judge over ground-truth annotated evaluation sets:
 | Metric | Sample Size ($N$) | Mean Score | Median Score | Key Engineering Insight |

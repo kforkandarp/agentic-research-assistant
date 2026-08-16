@@ -67,14 +67,25 @@ Deploying uniform, high-parameter LLMs across all state nodes introduces unneces
 
 | Graph Node | Model Assignment | Latency / Speed Profile | Engineering Rationale |
 |---|---|---|---|
-| **Router** | GPT OSS 20B (`openai/gpt-oss-20b`) | Under 150 ms (1,000 T/s) | 4-class single-step query classification via Pydantic structured output requires minimal parameter capacity. Sub-200ms latency ensures instant routing. |
-| **Evaluate** | GPT OSS 120B (`openai/gpt-oss-120b`) | ~600 ms (500 T/s) | Multi-step evidence sufficiency evaluation requires high-capacity reasoning across accumulated state context. |
-| **Synthesize** | GPT OSS 120B (`openai/gpt-oss-120b`) | ~1,000 ms (500 T/s) | Final answer synthesis demands strict grounding adherence to prompt instructions to eliminate parametric knowledge leakage. |
+| **Router** | GPT OSS 20B (`openai/gpt-oss-20b`) | **1,000 T/s** (250K TPM, $0.075 in / $0.30 out per 1M) | 4-class single-step query classification via Pydantic structured output. Lightweight parameter capacity minimizes cost on pure intent classification. |
+| **Evaluate** | GPT OSS 120B (`openai/gpt-oss-120b`) | **500 T/s** (250K TPM, $0.15 in / $0.60 out per 1M) | Multi-step evidence sufficiency evaluation requires high-capacity reasoning across accumulated state context. |
+| **Synthesize** | GPT OSS 120B (`openai/gpt-oss-120b`) | **500 T/s** (250K TPM, $0.15 in / $0.60 out per 1M) | Final answer synthesis demands strict grounding adherence to prompt instructions to eliminate parametric knowledge leakage. |
 
-### Unit Economics Calculation
+### Empirical Model Tiering Ablation ($N=50$ Adversarial Set)
 
+To empirically validate using `openai/gpt-oss-20b` for intent routing rather than deploying `openai/gpt-oss-120b` uniformly across the graph, an isolated ablation study was conducted over an adversarial boundary dataset (`eval/ablation_router_set.json`). The benchmark specifically tests edge cases: implicit numerical extractions, out-of-index ML models, temporal 2026 search cues, and speculative unanswerable prompts.
+
+| Configuration | Model Tier | Adversarial Router Accuracy ($N=50$) | Avg Router Latency | Cost / 1M Input Tokens |
+|:---|:---|:---:|:---:|:---:|
+| **Homogeneous Baseline** | `openai/gpt-oss-120b` | **88.0%** (44/50) | 5,088.5 ms | $0.150 |
+| **Asymmetric Tiered** | `openai/gpt-oss-20b` | **82.0%** (41/50) | ~5,598 ms (Avg. Latency — Adversarial Ablation Run, N=50) | **$0.075** *(50.0% Cost Reduction)* |
+
+> **Note on latency figures:** The per-query throughput figures in the architecture table above (1,000 T/s / 500 T/s) reflect raw model inference speed as published by the API provider. The ~5,088–5,598 ms figures in this ablation table are *end-to-end benchmark-run averages* across the full adversarial suite — inclusive of network round-trip time, structured-output validation, and retry overhead — and should not be read as a regression in per-token inference speed.
+
+#### Unit Economics & Architecture Insights
 * **Tiered Routing Cost Reduction:** `openai/gpt-oss-20b` costs **$0.075** per 1M input tokens vs. **$0.15** per 1M input tokens for `openai/gpt-oss-120b`. Delegating classification to the 20B tier cuts routing token costs by an estimated **50.0%** per routing turn.
-* **Throughput & Latency:** Delegating 4-class classification to the 20B tier delivers **1,000 tokens/sec** throughput and sub-150ms decision latency, maintaining **90.0% routing accuracy** ($N=50$) while conserving high-parameter reasoning quotas for downstream synthesis.
+* **Pareto Frontier Optimization:** Asymmetric tiering retains **93.2% of baseline routing accuracy** while slashing classification token expenditure by **50.0%** ($0.075 vs. $0.150 per 1M input tokens).
+* **Handling Open-Weight Structured Output Drops (`adv_37`):** During adversarial testing on nuanced parameter queries (`adv_37`), the 20B tier encountered a function-calling schema drop (`HTTP 400 tool_use_failed` with empty payload generation). Production resiliency handlers in `src/llm.py` intercept dropped tool schemas and fall back gracefully, ensuring pipeline stability without unhandled exceptions.
 
 ---
 
@@ -132,7 +143,10 @@ Raw PDF Parsing ──> Regex Section Splitting ──> Contextual Chunking ─�
 
 ## 6. Quantitative Evaluation Post-Mortem
 
-System evaluation was conducted using a **50-Question Benchmark Suite** and **RAGAS 0.2.x Quality Metrics** judged by GPT OSS 20B (`openai/gpt-oss-20b`) to eliminate TPM rate-limit bottlenecks.
+System evaluation was conducted across two distinct suites:
+
+1. **End-to-End System Evaluation Benchmark (`eval/eval_set.json`, $N=50$):** Achieved **94.0% End-to-End System Accuracy** (47/50 queries resolved and routed correctly across multi-step retrieval, arithmetic, and temporal web searches).
+2. **RAGAS 0.2.x Quality Metrics:** Evaluated over ground-truth annotated retrieval contexts judged by GPT OSS 20B (`openai/gpt-oss-20b`) to avoid token-per-minute rate limit throttling.
 
 ### RAGAS Performance Breakdown
 
