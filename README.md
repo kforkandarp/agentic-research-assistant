@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-<b>Production-grade self-correcting agent system</b> built with LangGraph over an ingested corpus of 45 ArXiv ML papers (~5,500+ chunks). Dynamically routes queries across hybrid vector search, Tavily web search, safe AST arithmetic evaluation, and direct answer synthesis. Features resilient Groq API key-rotation failover, a deterministic evaluator loop, streaming Streamlit UI, FastAPI endpoints, and containerized Docker deployment.
+<b>Self-correcting agent system</b> built with LangGraph over an ingested corpus of 45 ArXiv ML papers (~5,500+ chunks). Dynamically routes queries across hybrid vector search, Tavily web search, safe AST arithmetic evaluation, and direct answer synthesis. Features resilient Groq API key-rotation failover, a deterministic evaluator loop, streaming Streamlit UI, FastAPI endpoints, and containerized Docker deployment.
 </p>
 
 ---
@@ -49,25 +49,25 @@ The agent follows a cyclic state machine topology: **`START` → `router` → `t
 
 ## 📊 Evaluation & Benchmark Results
 
-### 1. Routing Accuracy
-* **50-Question Benchmark Suite:** **94.0% End-to-End System Accuracy** (47 / 50 questions executed and routed correctly).
+### 1. Task Routing & Execution Accuracy (System Evaluation Set, N=50)
+* **50-Question System Evaluation Suite:** **94.0% Task Routing / Execution Accuracy** (47 / 50 questions correctly routed and executed). This measures whether the router selected and executed the correct tool path — it does not independently grade final-answer correctness.
 * Evaluated across 6 target query types: single-hop paper retrieval, multi-step tool chains (`retrieval` + `calculator` / `web_search`), pure arithmetic, direct machine learning definitions, live web search, and unanswerable corpus queries.
 
 ![Eval Set Results](assets/eval_results.png)
 
 ---
 
-### 2. Model Tiering Ablation Study ($N=50$)
+### 2. Router Model Ablation — Independent Adversarial Set (N=50)
 
 To empirically validate using `openai/gpt-oss-20b` for intent classification instead of `openai/gpt-oss-120b`, we evaluated both models against an independent, adversarial boundary dataset (`eval/ablation_router_set.json`). This suite tests edge cases including implicit math extraction, out-of-index ML architectures, dynamic 2026 search queries, and unanswerable refusal prompts.
 
-| Configuration | Model Tier | Router Accuracy ($N=50$) | Avg Latency | Cost / 1M Input Tokens |
+| Configuration | Model Tier | Router Accuracy ($N=50$) | Avg Latency (Benchmark Run) | Cost / 1M Input Tokens |
 |:---|:---|:---:|:---:|:---:|
 | **Homogeneous Baseline** | `openai/gpt-oss-120b` | **88.0%** (44/50) | 5,088.5 ms | $0.150 |
 | **Asymmetric Tiered** | `openai/gpt-oss-20b` | **82.0%** (41/50) | 5,598.8 ms | **$0.075** *(50.0% Reduction)* |
 
-* **Cost-Efficiency Pareto Trade-off:** The asymmetric tiered architecture retains **93.2% of baseline routing accuracy** while cutting router token expenditure by **50.0%**.
-* **Edge-Case Schema Enforcement (`adv_37`):** On highly nuanced parameter-extraction queries, smaller open-weight models can drop function-calling payloads (`HTTP 400 tool_use_failed`). Production resiliency handlers wrap router dispatches in fallback retries to intercept schema drops and maintain system stability.
+* **Cost-Efficiency Trade-off:** Routing accuracy decreased from **88.0% → 82.0%** while routing-token cost decreased by **50.0%**; average latency did not improve in this benchmark (5,088.5 ms → 5,598.8 ms) — the ablation demonstrates a token-cost reduction, not a speed gain.
+* **Edge-Case Schema Enforcement (`adv_37`):** On highly nuanced parameter-extraction queries, smaller open-weight models can drop function-calling payloads (`HTTP 400 tool_use_failed`). Fallback/retry handlers wrap router dispatches to intercept schema drops and maintain system stability.
 
 <details>
 <summary>adv_37 failure log</summary>
@@ -82,7 +82,7 @@ To empirically validate using `openai/gpt-oss-20b` for intent classification ins
 
 ### 3. RAGAS Quality Benchmark
 
-Evaluated using GPT OSS 20B (`openai/gpt-oss-20b`) as judge over ground-truth annotated evaluation sets:
+Evaluated using GPT OSS 20B (`openai/gpt-oss-20b`) as judge over ground-truth annotated evaluation sets. Sample size differs per metric because each metric requires different fields to be present: Answer Relevancy needs only the final answer, Faithfulness additionally requires retrieved/web context (so calculator-only or context-free answers are excluded), and Context Precision further requires a ground-truth reference and applies only to retrieval-routed questions — narrowing N as requirements stack:
 | Metric | Sample Size ($N$) | Mean Score | Median Score | Key Engineering Insight |
 |---|---|---|---|---|
 | **Context Precision** | 11 retrieval queries | **0.9091** | **1.0000** | Cross-Encoder reranking (`ms-marco`) + thresholding ($-2.5$ logit cutoff) ranks top relevant chunks at rank 1. |
@@ -136,7 +136,7 @@ Interactive Swagger documentation is available at `http://localhost:8000/docs` w
 | Retrieval Fusion | LangChain `EnsembleRetriever` (50/50 BM25 + FAISS) |
 | Reranking & Filtering | Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) with $-2.5$ logit score cutoff |
 | Web Search | Tavily Search API |
-| Calculator | `numexpr` (AST-parsed mathematical evaluator — safe from `eval()` injection) |
+| Calculator | `numexpr` (AST-parsed evaluator — avoids Python `eval()`) |
 | Evaluation | RAGAS 0.2.x + custom benchmark suite |
 | Backend API | FastAPI + Uvicorn |
 | UI | Streamlit (Native node-level event streaming) |

@@ -20,7 +20,7 @@ Standard Retrieval-Augmented Generation (RAG) architectures rely primarily on li
 
 * **Determinism Over Pure Prompting:** Enforce hard control flow guardrails and deterministic AST parsers rather than relying solely on probabilistic LLM instruction-following.
 * **Decoupled Asymmetric Processing:** Segregate task complexity across distinct model tiers to optimize latency and token allocation.
-* **System Resilience:** Design for zero single-point-of-failure API dependencies through automated key rotation and exponential backoff retry strategies.
+* **System Resilience:** Reduce single-key quota/rate-limit failure modes through automated key rotation and exponential backoff retry strategies.
 * **Explainable Evaluation & Metric Transparency:** Measure system performance quantitatively via RAGAS quality benchmarks and custom routing accuracy suites.
 
 ---
@@ -65,7 +65,7 @@ To prevent multi-tool agent loops from entering infinite recursion during unansw
 
 Deploying uniform, high-parameter LLMs across all state nodes introduces unnecessary token expense and processing overhead. Task complexity is segregated across two production tiers:
 
-| Graph Node | Model Assignment | Latency / Speed Profile | Engineering Rationale |
+| Graph Node | Model Assignment | Provider-Reported Throughput | Engineering Rationale |
 |---|---|---|---|
 | **Router** | GPT OSS 20B (`openai/gpt-oss-20b`) | **1,000 T/s** (250K TPM, $0.075 in / $0.30 out per 1M) | 4-class single-step query classification via Pydantic structured output. Lightweight parameter capacity minimizes cost on pure intent classification. |
 | **Evaluate** | GPT OSS 120B (`openai/gpt-oss-120b`) | **500 T/s** (250K TPM, $0.15 in / $0.60 out per 1M) | Multi-step evidence sufficiency evaluation requires high-capacity reasoning across accumulated state context. |
@@ -75,7 +75,7 @@ Deploying uniform, high-parameter LLMs across all state nodes introduces unneces
 
 To empirically validate using `openai/gpt-oss-20b` for intent routing rather than deploying `openai/gpt-oss-120b` uniformly across the graph, an isolated ablation study was conducted over an adversarial boundary dataset (`eval/ablation_router_set.json`). The benchmark specifically tests edge cases: implicit numerical extractions, out-of-index ML models, temporal 2026 search cues, and speculative unanswerable prompts.
 
-| Configuration | Model Tier | Adversarial Router Accuracy ($N=50$) | Avg Router Latency | Cost / 1M Input Tokens |
+| Configuration | Model Tier | Adversarial Router Accuracy ($N=50$) | Avg Router Latency (Benchmark Run) | Cost / 1M Input Tokens |
 |:---|:---|:---:|:---:|:---:|
 | **Homogeneous Baseline** | `openai/gpt-oss-120b` | **88.0%** (44/50) | 5,088.5 ms | $0.150 |
 | **Asymmetric Tiered** | `openai/gpt-oss-20b` | **82.0%** (41/50) | ~5,598 ms (Avg. Latency — Adversarial Ablation Run, N=50) | **$0.075** *(50.0% Cost Reduction)* |
@@ -84,19 +84,19 @@ To empirically validate using `openai/gpt-oss-20b` for intent routing rather tha
 
 #### Unit Economics & Architecture Insights
 * **Tiered Routing Cost Reduction:** `openai/gpt-oss-20b` costs **$0.075** per 1M input tokens vs. **$0.15** per 1M input tokens for `openai/gpt-oss-120b`. Delegating classification to the 20B tier cuts routing token costs by an estimated **50.0%** per routing turn.
-* **Pareto Frontier Optimization:** Asymmetric tiering retains **93.2% of baseline routing accuracy** while slashing classification token expenditure by **50.0%** ($0.075 vs. $0.150 per 1M input tokens).
-* **Handling Open-Weight Structured Output Drops (`adv_37`):** During adversarial testing on nuanced parameter queries (`adv_37`), the 20B tier encountered a function-calling schema drop (`HTTP 400 tool_use_failed` with empty payload generation). Production resiliency handlers in `src/llm.py` intercept dropped tool schemas and fall back gracefully, ensuring pipeline stability without unhandled exceptions.
+* **Cost-Accuracy Trade-off:** Routing accuracy decreased from **88.0% → 82.0%** while classification token expenditure decreased by **50.0%** ($0.075 vs. $0.150 per 1M input tokens); this is a token-cost reduction, not an accuracy or latency improvement.
+* **Handling Open-Weight Structured Output Drops (`adv_37`):** During adversarial testing on nuanced parameter queries (`adv_37`), the 20B tier encountered a function-calling schema drop (`HTTP 400 tool_use_failed` with empty payload generation). Fallback/retry handlers in `src/llm.py` intercept dropped tool schemas and fall back gracefully, ensuring pipeline stability without unhandled exceptions.
 
 ---
 
-## 4. High-Precision Retrieval Architecture
+## 4. Hybrid Retrieval & Reranking Architecture
 
 ### Ingestion Pipeline: Regex Section Splitting vs. Layout-Aware Parsers (Docling)
 
 The local research corpus comprises 45 ArXiv Machine Learning papers (~5,500+ chunks).
 
 * **Why Layout-Aware Parsers Were Rejected:** Heavy vision/layout parsers (e.g., Docling, Unstructured) introduce massive GPU/OCR binary dependencies and significantly slow down ingestion pipelines.
-* **Why Custom Regex Chunking Was Chosen:** ArXiv ML papers feature standardized text section headers. Custom regex parsing (`src/ingest.py`) isolates structural sections (`1. Introduction`, `3. Methodology`) instantly at pure string-parsing speed with zero heavy ML dependencies.
+* **Why Custom Regex Chunking Was Chosen:** ArXiv ML papers feature standardized text section headers. Custom regex parsing (`src/ingest.py`) isolates structural sections (`1. Introduction`, `3. Methodology`) instantly at pure string-parsing speed while avoiding the heavy vision/OCR dependencies required by layout-aware parsers.
 * **Execution:** Isolates section blocks prior to applying `RecursiveCharacterTextSplitter` (800 character size / 150 overlap) and annotates metadata (title, section, page, chunk index).
 
 ```
@@ -118,7 +118,7 @@ Raw PDF Parsing ──> Regex Section Splitting ──> Contextual Chunking ─�
 ### Reranking & Logit Filtering
 
 * **Cross-Encoder Reranking:** Top 15 candidate chunks pass through a `ms-marco-MiniLM-L-6-v2` Cross-Encoder to compute joint semantic relevance.
-* **Logit Thresholding (-2.5 Cutoff):** Chunks yielding logit relevance scores below -2.5 are pruned immediately, preventing context window bloat and eliminating weak relevance noise.
+* **Logit Thresholding (-2.5 Cutoff):** Chunks yielding logit relevance scores below -2.5 are pruned immediately, preventing context window bloat and filtering low-scoring candidate chunks before synthesis.
 
 ---
 
@@ -131,7 +131,7 @@ Raw PDF Parsing ──> Regex Section Splitting ──> Contextual Chunking ─�
 
 ### AST Math Evaluation via `numexpr`
 
-* **Security:** Replaces dangerous Python `eval()` calls (code injection risk) with isolated AST parsing.
+* **Security:** Replaces Python `eval()` with `numexpr`'s isolated AST-based expression evaluator, avoiding the arbitrary code-execution risk associated with `eval()`.
 * **Performance:** Evaluates arithmetic expressions via compiled C-level vector loops with zero system execution privileges.
 
 ### Microservice Architecture (FastAPI + Docker)
@@ -145,8 +145,8 @@ Raw PDF Parsing ──> Regex Section Splitting ──> Contextual Chunking ─�
 
 System evaluation was conducted across two distinct suites:
 
-1. **End-to-End System Evaluation Benchmark (`eval/eval_set.json`, $N=50$):** Achieved **94.0% End-to-End System Accuracy** (47/50 queries resolved and routed correctly across multi-step retrieval, arithmetic, and temporal web searches).
-2. **RAGAS 0.2.x Quality Metrics:** Evaluated over ground-truth annotated retrieval contexts judged by GPT OSS 20B (`openai/gpt-oss-20b`) to avoid token-per-minute rate limit throttling.
+1. **System Evaluation Benchmark — Task Routing & Execution (`eval/eval_set.json`, $N=50$):** Achieved **94.0% Task Routing / Execution Accuracy** (47/50 queries correctly routed and executed across multi-step retrieval, arithmetic, and temporal web searches). This metric grades tool-routing correctness, not independent final-answer correctness.
+2. **RAGAS 0.2.x Quality Metrics:** Evaluated over ground-truth annotated retrieval contexts judged by GPT OSS 20B (`openai/gpt-oss-20b`) to avoid token-per-minute rate limit throttling. Sample size differs per metric because each metric requires different fields: Answer Relevancy needs only the final answer, Faithfulness additionally requires retrieved/web context, and Context Precision further requires a ground-truth reference and applies only to retrieval-routed questions.
 
 ### RAGAS Performance Breakdown
 
@@ -162,7 +162,7 @@ Initial evaluation runs yielded a Faithfulness score of ≈0.65 due to parametri
 
 * **Prompt Hardening:** Updated system synthesis prompts to mandate strict grounding: *"Answer ONLY using provided evidence. If evidence is insufficient, explicitly state missing information."*
 * **Logit Cutoff Tuning:** Raised Cross-Encoder logit filter to -2.5, stripping low-confidence context before synthesis.
-* **Outcome:** Lifted mean Faithfulness to **0.7633** and median Faithfulness to **0.8167**.
+* **Outcome:** The combined prompt-hardening and reranker-threshold intervention lifted mean Faithfulness to **0.7633** and median Faithfulness to **0.8167**; the individual contribution of each change was not isolated.
 
 ---
 
@@ -172,7 +172,7 @@ Initial evaluation runs yielded a Faithfulness score of ≈0.65 due to parametri
    Transition the FastAPI POST endpoint to Server-Sent Events (SSE) to stream intermediate graph node updates (`router` → `retrieval` → `evaluate`) and real-time answer tokens directly to the client to minimize Time-to-First-Token (TTFT).
 
 2. **Semantic Query Caching:**
-   Integrate a Redis-backed semantic caching layer upstream of the query router. Semantically equivalent queries will serve cached final responses immediately, reducing LLM token consumption and delivering sub-50ms response latencies.
+   Integrate a Redis-backed semantic caching layer upstream of the query router. Semantically equivalent queries would serve cached final responses immediately, reducing LLM token consumption, with a target of sub-50ms cache-hit latency.
 
 3. **Asynchronous Parallel Tool Execution:**
    Refactor tool execution nodes to leverage Python `asyncio` concurrent gathering (`asyncio.gather`). When the evaluator requests multi-source evidence, execute vector search and web search concurrently rather than blocking sequential graph steps.
