@@ -35,7 +35,7 @@ class DirectGroqRagasLLM(BaseRagasLLM):
     def __init__(self, temperature: float = 0.0):
         super().__init__()
         api_key = (
-            os.getenv("GROQ_API_KEY1")
+            os.getenv("GROQ_API_KEY1") # the first true value out of all these will be used as api_key
             or os.getenv("GROQ_API_KEY")
             or os.getenv("GROQ_API_KEY2")
         )
