@@ -42,15 +42,42 @@ def web_search_node(state: AgentState) -> dict:
     return {"tool_outputs": [record]}
 
 
-def calculator_node(state: AgentState) -> dict:
-    """Extracts numbers from query + gathered evidence and evaluates math via numexpr."""
-    query = state["query"]
-    evidence = "\n".join(r["output"] for r in state["tool_outputs"])
-    full_context = f"Query: {query}\nEvidence:\n{evidence}"
-    output = calculator_tool(full_context)
-    record = {"tool": "calculator", "output": output}
-    return {"tool_outputs": [record]}
 
+
+def calculator_node(state: AgentState) -> dict:
+    """Extract and evaluate a mathematical expression from the user query."""
+    query = state["query"].strip()
+
+    # Remove common natural-language prefixes.
+    expression = re.sub(
+        r"(?i)^(what is|calculate|compute|evaluate|solve)\s*",
+        "",
+        query,
+    ).strip().rstrip("?").strip()
+
+    # Accept arithmetic expressions containing parentheses and exponents.
+    if not re.fullmatch(r"[0-9\s()+\-*/%.]+", expression):
+        # Fallback: locate a mathematical expression inside the query.
+        match = re.search(
+            r"(?<![\w.])"
+            r"([0-9][0-9\s().+\-*/%]*[+\-*/%][0-9\s().+\-*/%]*)"
+            r"(?![\w.])",
+            query,
+        )
+
+        if match:
+            expression = match.group(1).strip()
+        else:
+            expression = query
+
+    output = calculator_tool(expression)
+
+    record = {
+        "tool": "calculator",
+        "output": output,
+    }
+
+    return {"tool_outputs": [record]}
 
 def direct_answer_node(state: AgentState) -> dict:
     """Uses general LLM parametric knowledge directly without tools."""
@@ -208,6 +235,24 @@ def evaluate_node(state: AgentState) -> dict:
             "missing_info": "Reached max evidence-gathering steps.",
             "_grade_sufficient": False,
         }
+
+    # Accept successful calculator results for arithmetic queries.
+    # Prevent unnecessary web searches for calculations.
+    calculator_outputs = [
+        r["output"]
+        for r in state["tool_outputs"]
+        if r["tool"] == "calculator"
+    ]
+
+    if calculator_outputs:
+        latest_result = calculator_outputs[-1]
+
+        if not latest_result.startswith("Error evaluating expression:"):
+            return {
+                "next_tool": None,
+                "missing_info": "",
+                "_grade_sufficient": True,
+            }
 
     if _looks_sufficient_without_llm(state):
         return {
